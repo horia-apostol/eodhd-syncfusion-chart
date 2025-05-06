@@ -1,0 +1,157 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+@using EodhdStockChartViewer.WebUI.Models
+@using EodhdStockChartViewer.WebUI.Services
+@using Syncfusion.Blazor
+@using Syncfusion.Blazor.Charts
+
+@inject ChartDataService ChartService
+
+<div class="container py-4">
+    <div class="row justify-content-center mb-4">
+        <div class="col-lg-6 text-center">
+            <form @onsubmit="HandleSearch">
+                <div class="input-group">
+                    <input type="text" @bind="Symbol" class="form-control font-monospace" placeholder="Type AAPL as an example." />
+                    <button class="btn btn-custom font-monospace" type="submit">Search</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            @if (IsLoading)
+            {
+                <div class="mt-5 stock-chart-loader position-relative"></div>
+            }
+            else
+            {
+                <div class="@ChartContainerClass">
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="alert alert-danger text-center">@ErrorMessage</div>
+                    }
+
+                    @if (StockData?.Any() == true)
+                    {
+                        <div class="card shadow-sm rounded-4">
+                            <div class="card-body">
+                                <SfStockChart @key="Symbol.ToUpper()" Title="@($"{Symbol.ToUpper()} stock prices")" Height="500px" Theme="Syncfusion.Blazor.Theme.Bootstrap5">
+                                    <StockChartEvents OnLoaded="@OnChartLoaded" AxisLabelRendering="OnAxisLabelRender" />
+                                    <StockChartChartArea>
+                                        <StockChartChartAreaBorder Width="0" />
+                                    </StockChartChartArea>
+                                    <StockChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.DateTime">
+                                        <StockChartAxisMajorGridLines Width="0" />
+                                        <StockChartAxisCrosshairTooltip Enable="true" />
+                                    </StockChartPrimaryXAxis>
+                                    <StockChartPrimaryYAxis LabelFormat="n2">
+                                        <StockChartAxisLineStyle Width="0" />
+                                    </StockChartPrimaryYAxis>
+                                    <StockChartAxes>
+                                        <StockChartAxis RowIndex="1" Name="yAxis1" LabelPosition="AxisPosition.Inside" EdgeLabelPlacement="EdgeLabelPlacement.Hide">
+                                            <StockChartAxisLineStyle Width="0" />
+                                            <StockChartAxisMajorTickLines Width="0" />
+                                        </StockChartAxis>
+                                    </StockChartAxes>
+                                    <StockChartRows>
+                                        <StockChartRow Height="30%" />
+                                        <StockChartRow Height="70%" />
+                                    </StockChartRows>
+                                    <StockChartSeriesCollection>
+                                        <StockChartSeries DataSource="@StockData" Type="ChartSeriesType.Candle" XName="date" High="high" Low="low" Open="open" Close="close" Name="@Symbol.ToUpper()" YAxisName="yAxis1" />
+                                        <StockChartSeries DataSource="@StockData" Type="ChartSeriesType.Column" XName="date" YName="volume" Name="Volume" />
+                                    </StockChartSeriesCollection>
+                                    <StockChartTooltipSettings Enable="true" Format="High : <b>${point.high}</b><br/>Low : <b>${point.low}</b><br/>Open : <b>${point.open}</b><br/>Close : <b>${point.close}</b><br/>Volume : <b>${point.volume}</b>" />
+                                    <StockChartCrosshairSettings Enable="true" />
+                                    <StockChartLegendSettings Visible="true" />
+                                </SfStockChart>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted text-center py-4">Chart is empty. Enter a valid symbol above.</div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control:focus {
+        box-shadow: 0 0 0 0.25rem var(--box-shadow-violet);
+        border-color: var(--primary-violet);
+        outline: none;
+        border: none;
+        transition: box-shadow 0.2s ease;
+    }
+
+    .btn-custom {
+        background-color: var(--primary-violet);
+        color: #fff;
+        border: 1px solid var(--primary-violet);
+        transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .btn-custom:hover {
+        background-color: var(--primary-violet-hover);
+        border-color: var(--primary-violet-hover);
+        color: #fff;
+    }
+
+    .btn-custom:focus,
+    .btn-custom:focus-visible {
+        box-shadow: 0 0 0 0.25rem var(--box-shadow-violet);
+        outline: none;
+    }
+
+    .btn-custom:active,
+    .btn-custom:active:focus {
+        background-color: var(--primary-violet-active);
+        border-color: var(--primary-violet-active);
+        box-shadow: 0 0 0 0.25rem var(--box-shadow-violet);
+        color: #fff;
+        outline: none;
+    }
+</style>
+
+@code {
+    private List<ChartData> StockData { get; set; } = new();
+    private string Symbol { get; set; } = "";
+    private string ChartContainerClass { get; set; } = "stock-chart-container";
+    private string? ErrorMessage { get; set; }
+    private bool IsLoading { get; set; }
+
+    private async Task HandleSearch()
+    {
+        if (string.IsNullOrWhiteSpace(Symbol))
+        {
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = null;
+        StateHasChanged();
+
+        ChartDataResult result = await ChartService.LoadChartDataAsync(Symbol);
+        StockData = result.Data;
+        ErrorMessage = result.Error;
+
+        IsLoading = false;
+    }
+
+    private void OnChartLoaded(StockChartEventArgs args)
+    {
+        StateHasChanged();
+    }
+
+    private void OnAxisLabelRender(StockChartAxisLabelRenderEventArgs args)
+    {
+        if (args.Text.Contains("0000000"))
+            args.Text = args.Text.Replace("0000000", "M");
+    }
+}
